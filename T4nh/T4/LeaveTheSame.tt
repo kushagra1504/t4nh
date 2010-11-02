@@ -1,0 +1,16 @@
+<#@ import namespace="System.IO" #>
+<#+
+public class LeaveTheSame : NhiberTemplate
+{
+	protected string fpath;
+
+	public LeaveTheSame(string fpath)
+	{
+		this.fpath = fpath;
+	}
+	
+	public override void RenderCore()
+	{
+		Write(File.ReadAllText(fpath));
+	}
+}#>

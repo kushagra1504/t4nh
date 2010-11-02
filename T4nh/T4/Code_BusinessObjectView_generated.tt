@@ -1,0 +1,69 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class BusinessObjectView_generated : BizObjViewTemplate
+{
+	public BusinessObjectView_generated(View view, Config cfg) : base(view, cfg)
+	{
+	}
+
+	public override void RenderCore()
+	{#>
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Xml;
+
+namespace <#=cfg.NamespaceBusinessObjects#>
+{
+	[Serializable]
+	public partial class <#=U.ViewName(v)#> : BusinessViewBase<<#=U.ViewName(v)#>>
+	{
+<#+if (PK != null) {#>
+		// pseudo-PK:
+		public virtual <#=U.CsType(PK)#> <#=U.PropertyName(PK)#> { get; set; }
+<#+}#>
+
+
+<#+if (Fields.Length > 0) { #>
+		// Fields:
+<#+ } #>
+<#+foreach (Column col in Fields) {#>
+		public virtual <#=U.CsType(col)#> <#=U.PropertyName(col)#> { get; set; }
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> e in Enums) {#>
+		public virtual <#=U.TableName(e.Value)#> <#=U.IdLessPropertyName(e.Key)#> { get; set; }
+<#+}#>
+
+<#+if (ManyToOne.Count > 0) { #>
+
+		// Many To One:
+<#+ } #>
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOne) {#>
+		public virtual <#=U.TableName(mto.Value)#> <#=U.IdLessPropertyName(mto.Key)#> { get; set; }
+<#+}#>
+
+<#+if (OneToMany.Count > 0) { #>
+
+		// One To Many:
+<#+ } #>
+<#+foreach (KeyValuePair<Column, string> otm in OneToMany) {#>
+		public virtual IList<<#=U.TableName(otm.Value)#>> <#=U.OneToManyName(OneToMany, otm)#> { get; set; }
+<#+}#>
+
+<#+if (ManyToMany.Count > 0) { #>
+
+		// Many To Many:
+<#+ } #>
+<#+foreach (KeyValuePair<Column, ForeignKey> mtm in ManyToMany) {#>
+		public virtual IList<<#=U.TableName(mtm.Value.ReferencedTable)#>> <#=U.ListName(mtm.Value.ReferencedTable)#> { get; set; }
+<#+}#>
+	}
+}
+<#+
+	}
+}
+#>

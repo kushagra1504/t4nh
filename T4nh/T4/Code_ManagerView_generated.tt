@@ -1,0 +1,53 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class ManagerView_generated : BizObjViewTemplate
+{
+	public ManagerView_generated(View view, Config cfg) : base(view, cfg)
+	{
+	}
+	
+	public override void RenderCore()
+	{#>
+using System;
+using System.Collections.Generic;
+using NHibernate;
+using <#=cfg.NamespaceBusinessObjects#>;
+
+namespace <#=cfg.NamespaceManagers#>
+{
+	public partial class <#=U.ViewName(v)#>Manager : ManagerViewBase<<#=U.ViewName(v)#>>
+	{
+		public static string ViewName { get { return "<#=v.Name#>"; } }
+
+		public <#=U.ViewName(v)#>Manager(ISession session, <#=cfg.UserContextInterfaceName#> userContext) : base(session, userContext) { }
+
+<#+if (PK != null) {#>
+		public virtual <#=U.ViewName(v)#> GetById(<#=U.CsType(PK)#> id)
+		{
+			return (<#=U.ViewName(v)#>)_session.Get(typeof(<#=U.ViewName(v)#>), id);
+		}
+		public virtual <#=U.ViewName(v)#> GetById(<#=U.CsType(PK)#> id, bool writeLock)
+		{
+			return (<#=U.ViewName(v)#>)_session.Get(typeof(<#=U.ViewName(v)#>), id, writeLock ? LockMode.Upgrade : LockMode.Read);
+		}
+<#+}#>
+
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOne) {#>
+
+		public IList<<#=U.ViewName(v)#>> GetBy<#=U.PropertyName(mto.Key)#>(<#=U.CsType(mto.Key)#> id)
+		{
+			ICriteria criteria = Session.CreateCriteria(typeof(<#=U.ViewName(v)#>));
+			ICriteria criteria<#=U.IdLessPropertyName(mto.Key)#> = criteria.CreateCriteria("<#=U.IdLessPropertyName(mto.Key)#>");
+			criteria<#=U.IdLessPropertyName(mto.Key)#>.Add(NHibernate.Criterion.Restrictions.Eq("Id", id));
+			return criteria.List< <#=U.ViewName(v)#> >();
+		}
+<#+}#>
+	}
+}
+<#+
+	}
+}#>

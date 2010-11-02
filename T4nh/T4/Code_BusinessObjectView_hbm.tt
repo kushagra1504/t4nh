@@ -1,0 +1,56 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class BusinessObjectView_hbm : BizObjViewTemplate
+{
+	public BusinessObjectView_hbm(View view, Config cfg) : base(view, cfg)
+	{
+	}
+	
+	public override void RenderCore()
+	{#>
+<?xml version="1.0" encoding="utf-8" ?>
+<hibernate-mapping xmlns="urn:nhibernate-mapping-2.2" namespace="<#=cfg.NamespaceBusinessObjects#>" assembly="<#=cfg.AssemblyName#>">
+	<class name="<#=cfg.NamespaceBusinessObjects#>.<#=U.ViewName(v)#>, <#=cfg.AssemblyName#>" table="<#=v.Schema + ".[" + v.Name#>]" lazy="false" mutable="false">
+		<cache region="longCache" usage="read-only"/>
+
+<#+if (PK != null) {#>
+		<id name="Id" column="<#=PK.Name#>">
+		 	<generator class="native" />
+		</id>
+<#+}#>
+
+<#+foreach (Column col in Fields) {#>
+		<property name="<#=U.PropertyName(col)#>" column="<#=col.Name#>" <#=col.Computed ? "insert=\"0\" update=\"0\"" : ""#>/>
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> e in Enums) {#>
+		<property name="<#=U.IdLessPropertyName(e.Key)#>" column="<#=e.Key.Name#>" />
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOne) {#>
+		<many-to-one name="<#=U.IdLessPropertyName(mto.Key)#>" column="<#=mto.Key.Name#>" class="<#=U.TableName(mto.Value)#>" />
+<#+}#>
+
+<#+foreach (KeyValuePair<Column, string> otm in OneToMany) {#>
+		<bag name="<#=U.OneToManyName(OneToMany, otm)#>" lazy="true" cascade="<#=otm.Key.Nullable ? "all" : "all-delete-orphan" #>" inverse="true">
+			<key column="<#=otm.Key.Name#>"></key>
+			<one-to-many class="<#=U.TableName(otm.Value)#>" />
+		</bag>
+<#+}#>
+
+<#+foreach (KeyValuePair<Column, ForeignKey> mtm in ManyToMany) {#>
+		<bag name="<#=U.ListName(mtm.Value.ReferencedTable)#>" table="<#=(mtm.Key.Parent as Table).Schema + "." + (mtm.Key.Parent as Table).Name#>" lazy="true" cascade="all" inverse="false">
+			<key column="<#=mtm.Key.Name#>"></key>
+<#+if (cfg.TreatAsEnums.ContainsKey(mtm.Value.ReferencedTable)) {#>
+			<element column="<#=mtm.Value.Columns[0].Name#>" type="<#=U.TableName(mtm.Value.ReferencedTable)#>" />
+<#+ } else {#>
+			<many-to-many column="<#=mtm.Value.Columns[0].Name#>" class="<#=U.TableName(mtm.Value.ReferencedTable)#>" />
+<#+ }#>
+		</bag>
+<#+}#>
+
+	</class>
+</hibernate-mapping>
+<#+	} }#>

@@ -1,0 +1,53 @@
+<#@ output extension="txt" #>
+<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Management.Sdk.Sfc" #>
+<#@ assembly name="System.Data" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Common" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Data" #>
+<#@ import namespace="System.Data" #>
+<#+
+public class Enums : NhiberTemplate
+{
+	ServerConnection conn;
+	Config cfg;
+	
+	public Enums(ServerConnection conn, Config cfg)
+	{
+		this.conn = conn;
+		this.cfg = cfg;
+	}
+
+	public override void RenderCore()
+	{#>
+using System.ComponentModel;
+
+namespace <#=cfg.NamespaceBusinessObjects#>
+{
+<#+
+foreach (KeyValuePair<string, string> kvp in cfg.TreatAsEnums)
+{
+	//DataSet ds = conn.ExecuteWithResults("SELECT * FROM [" + dbName + "].[dbo].[" + enumName + "]");
+	DataSet ds = conn.ExecuteWithResults("SELECT * FROM [" + cfg.DatabaseName + "].[dbo].[" + kvp.Key + "]");
+	#>
+
+	public enum <#=U.TableName(kvp.Key)#>
+	{
+<#+foreach (DataRow row in ds.Tables[0].Rows) {
+	string name = kvp.Value, desc = null;
+	if (name.Contains(";")) { desc = name.Split(';')[1]; name = name.Split(';')[0]; }
+	if (desc != null && row[desc].ToString().Length > 0) { #>
+		/// <summary>
+		/// <#= row[desc].ToString().Replace("; ", ";\r\n\t\t/// ") #>
+		/// </summary>
+		[Description("<#= row[desc].ToString().Split(';')[0] #>")]
+<#+ } #>
+		<#=row[name].ToString().Replace(" ", "")#> = <#=row[0]#>,
+<#+}#>
+	}
+<#+}#>
+}
+<#+
+	}
+}#>

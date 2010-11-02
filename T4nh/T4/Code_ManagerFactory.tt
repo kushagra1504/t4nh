@@ -1,0 +1,79 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class ManagerFactory : NhiberTemplate
+{
+	Database db;
+	Config cfg;
+
+	public ManagerFactory(Database db, Config cfg)
+	{
+		this.db = db;
+		this.cfg = cfg;
+	}
+
+	public override void RenderCore()
+	{#>
+using System;
+using System.Collections.Generic;
+using System.Web;
+using NHibernate;
+
+namespace <#=cfg.NamespaceManagers#>
+{
+	public partial class ManagerFactory
+	{
+		public ISession Session { get; private set; }
+		private <#=cfg.UserContextInterfaceName#> UserContext { get; set; }
+	
+		public ManagerFactory(ISession session, <#=cfg.UserContextInterfaceName#> userContext)
+		{
+			Session = session;
+			UserContext = userContext;
+		}
+
+		public ManagerFactory(<#=cfg.UserContextInterfaceName#> userContext)
+		{
+			Session = NHibernateSessionManager.Instance.GetSessionFrom(
+				NHIBERNATE_CONFIG_PATH.StartsWith("~/")
+					? (HttpContext.Current != null ? HttpContext.Current.Server.MapPath(NHIBERNATE_CONFIG_PATH) : NHIBERNATE_CONFIG_PATH.Replace("~/", Environment.CurrentDirectory + "\\"))
+					: NHIBERNATE_CONFIG_PATH
+					, userContext
+
+			);
+			UserContext = userContext;
+		}
+
+		public ManagerFactory()
+			: this(null)
+		{
+		}
+
+<#+
+		foreach (Table table in db.Tables)
+		{
+			if (table.IsSystemObject) continue;
+			if (Array.Exists(cfg.IgnoreTables, i => i == table.Name)) continue;#>
+		<#=U.TableName(table)#>Manager _<#=U.TableName(table)#>Manager;
+		public <#=U.TableName(table)#>Manager Get<#=U.TableName(table)#>Manager() { if(_<#=U.TableName(table)#>Manager == null) { _<#=U.TableName(table)#>Manager = new <#=U.TableName(table)#>Manager(Session, UserContext); } return _<#=U.TableName(table)#>Manager; }
+		public <#=U.TableName(table)#>Manager Get<#=U.TableName(table)#>Manager(ISession session) { if(_<#=U.TableName(table)#>Manager == null){ _<#=U.TableName(table)#>Manager = new <#=U.TableName(table)#>Manager(session, UserContext); } return _<#=U.TableName(table)#>Manager; }
+<#+		}#>
+
+<#+
+		foreach (View view in db.Views)
+		{
+			if (view.IsSystemObject) continue;
+			if (Array.Exists(cfg.IgnoreTables, i => i == view.Name)) continue;
+			if((cfg.ViewPrefix.Length > 0) && (!view.Name.StartsWith(cfg.ViewPrefix))) continue;#>
+		<#=U.ViewName(view)#>Manager _<#=U.ViewName(view)#>Manager;
+		public <#=U.ViewName(view)#>Manager Get<#=U.ViewName(view)#>Manager() { if(_<#=U.ViewName(view)#>Manager == null) { _<#=U.ViewName(view)#>Manager = new <#=U.ViewName(view)#>Manager(Session, UserContext); } return _<#=U.ViewName(view)#>Manager; }
+		public <#=U.ViewName(view)#>Manager Get<#=U.ViewName(view)#>Manager(ISession session) { if(_<#=U.ViewName(view)#>Manager == null){ _<#=U.ViewName(view)#>Manager = new <#=U.ViewName(view)#>Manager(session, UserContext); } return _<#=U.ViewName(view)#>Manager; }
+<#+		}#>
+	}
+}
+<#+
+	}
+}#>

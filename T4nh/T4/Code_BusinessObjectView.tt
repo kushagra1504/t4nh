@@ -1,0 +1,27 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class BusinessObjectView : BizObjViewTemplate
+{
+	public BusinessObjectView(View view, Config cfg) : base(view, cfg)
+	{
+	}
+	
+	public override void RenderCore()
+	{#>
+using System;
+using System.Collections.Generic;
+using NHibernate;
+
+namespace <#=cfg.NamespaceBusinessObjects#>
+{
+	public partial class <#=U.ViewName(v)#>
+	{
+	}
+}
+<#+
+	}
+}#>

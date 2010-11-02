@@ -1,0 +1,29 @@
+<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class Manager : BizObjTemplate
+{
+	public Manager(Table table, Config cfg) : base(table, cfg)
+	{
+	}
+	
+	public override void RenderCore()
+	{#>
+using System;
+using System.Collections.Generic;
+using NHibernate;
+using NHibernate.Criterion;
+using <#=cfg.NamespaceBusinessObjects#>;
+
+namespace <#=cfg.NamespaceManagers#>
+{
+	public partial class <#=U.TableName(t)#>Manager
+	{
+	}
+}
+<#+
+	}
+}#>

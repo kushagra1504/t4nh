@@ -1,0 +1,55 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class BusinessObject_hbm : BizObjTemplate
+{
+	public BusinessObject_hbm(Table table, Config cfg) : base(table, cfg)
+	{
+	}
+	
+	public override void RenderCore()
+	{#>
+<?xml version="1.0" encoding="utf-8" ?>
+<hibernate-mapping xmlns="urn:nhibernate-mapping-2.2" namespace="<#=cfg.NamespaceBusinessObjects#>" assembly="<#=cfg.AssemblyName#>">
+	<class name="<#=cfg.NamespaceBusinessObjects#>.<#=U.TableName(t)#>, <#=cfg.AssemblyName#>" table="<#=t.Schema + ".[" + t.Name#>]" lazy="true" dynamic-update="true" dynamic-insert="true">
+<#+if (props.ContainsKey("use_cache")) {#>
+		<cache region="longCache" usage="read-only"/>
+<#+}#>
+		<id name="Id" column="<#=PK.Name#>">
+		 	<generator class="<#=PK.Identity ? "native" : "assigned"#>" />
+		</id>
+<#+foreach (Column col in Fields) {#>
+		<property name="<#=U.PropertyName(col)#>" type="<#=U.NHiberType(col)#>" <#=col.Computed ? "insert=\"0\" update=\"0\"" : ""#>>
+			<column name="<#=col.Name#>" sql-type="<#=col.DataType.Name#>" not-null="<#=(!col.Nullable).ToString().ToLower() #>" <#=(col.DataType.Name == "varchar" || col.DataType.Name == "nvarchar") && (int)col.Properties["Length"].Value != -1 ? "length=\"" + col.Properties["Length"].Value + "\"" : "" #> />
+		</property>
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> e in Enums) {#>
+		<property name="<#=U.IdLessPropertyName(e.Key)#>" column="<#=e.Key.Name#>" />
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOne) {#>
+		<many-to-one name="<#=U.IdLessPropertyName(mto.Key)#>" column="<#=mto.Key.Name#>" class="<#=U.TableName(mto.Value)#>" />
+<#+}#>
+
+<#+foreach (KeyValuePair<Column, string> otm in OneToMany) {#>
+		<bag name="<#=U.OneToManyName(OneToMany, otm)#>" lazy="true" cascade="<#=otm.Key.Nullable ? "all" : "all-delete-orphan" #>" inverse="true">
+			<key column="<#=otm.Key.Name#>"></key>
+			<one-to-many class="<#=U.TableName(otm.Value)#>" />
+		</bag>
+<#+}#>
+
+<#+foreach (KeyValuePair<Column, ForeignKey> mtm in ManyToMany) {#>
+		<bag name="<#=U.ManyToManyName(ManyToMany, mtm)#>" table="<#=(mtm.Key.Parent as Table).Schema + "." + (mtm.Key.Parent as Table).Name#>" lazy="true" cascade="save-update" inverse="false">
+			<key column="<#=mtm.Key.Name#>"></key>
+<#+if (cfg.TreatAsEnums.ContainsKey(mtm.Value.ReferencedTable)) {#>
+			<element column="<#=mtm.Value.Columns[0].Name#>" type="<#=U.TableName(mtm.Value.ReferencedTable)#>" />
+<#+ } else {#>
+			<many-to-many column="<#=mtm.Value.Columns[0].Name#>" class="<#=U.TableName(mtm.Value.ReferencedTable)#>" />
+<#+ }#>
+		</bag>
+<#+}#>
+	</class>
+</hibernate-mapping>
+<#+	} }#>

@@ -1,0 +1,134 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class BusinessObject_generated : BizObjTemplate
+{
+	public BusinessObject_generated(Table table, Config cfg) : base(table, cfg)
+	{
+	}
+
+	public override void RenderCore()
+	{#>
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Xml;
+
+namespace <#=cfg.NamespaceBusinessObjects#>
+{
+	[Serializable]
+	public partial class <#=U.TableName(t)#> : BusinessBase<<#=U.CsType(PK) #>, <#=U.TableName(t)#>>
+	{
+<#+if (Fields.Length > 0) { #>
+		// Fields:
+<#+ } #>
+<#+foreach (Column col in Fields) {#>
+		public virtual <#=U.CsType(col)#> <#=U.PropertyName(col)#> { get; set; }
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> e in Enums) {#>
+		public virtual <#=U.TableName(e.Value)#> <#=U.IdLessPropertyName(e.Key)#> { get; set; }
+<#+}#>
+
+<#+if (ManyToOne.Count > 0) { #>
+
+		// Many To One:
+<#+ } #>
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOne) {#>
+		public virtual <#=U.TableName(mto.Value)#> <#=U.IdLessPropertyName(mto.Key)#> { get; set; }
+<#+}#>
+
+<#+if (OneToMany.Count > 0) { #>
+
+		// One To Many:
+<#+ } #>
+<#+foreach (KeyValuePair<Column, string> otm in OneToMany) {#>
+		public virtual IList<<#=U.TableName(otm.Value)#>> <#=U.OneToManyName(OneToMany, otm)#> { get; set; }
+<#+}#>
+
+<#+if (ManyToMany.Count > 0) { #>
+
+		// Many To Many:
+<#+ } #>
+<#+foreach (KeyValuePair<Column, ForeignKey> mtm in ManyToMany) {#>
+		public virtual IList<<#=U.TableName(mtm.Value.ReferencedTable)#>> <#=U.ManyToManyName(ManyToMany, mtm)#> { get; set; }
+<#+}#>
+
+		public override <#=U.TableName(t)#> Clone(bool inclSubcollections, Dictionary<string, object> usedObjects)
+		{
+			var copy = new <#=U.TableName(t)#>();
+			usedObjects.Add("<#=U.TableName(t)#>" + this.Id, copy);
+			
+<#+foreach (Column col in Fields) {#>
+			copy.<#=U.PropertyName(col)#> = this.<#=U.PropertyName(col)#>;
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> e in Enums) {#>
+			copy.<#=U.IdLessPropertyName(e.Key)#> = this.<#=U.IdLessPropertyName(e.Key)#>;
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOne) {#>
+			copy.<#=U.IdLessPropertyName(mto.Key)#> = (this.<#=U.IdLessPropertyName(mto.Key)#> != null && usedObjects.ContainsKey("<#=U.TableName(mto.Value)#>" + this.<#=U.IdLessPropertyName(mto.Key)#>.Id) ? usedObjects["<#=U.TableName(mto.Value)#>" + this.<#=U.IdLessPropertyName(mto.Key)#>.Id] as <#=U.TableName(mto.Value)#> : this.<#=U.IdLessPropertyName(mto.Key)#>);
+<#+}#>
+
+			if (inclSubcollections)
+			{
+<#+foreach (KeyValuePair<Column, string> otm in OneToMany) {#>
+				copy.<#=U.OneToManyName(OneToMany, otm)#> = new List<<#=U.TableName(otm.Value)#>>();
+				foreach (var item in this.<#=U.OneToManyName(OneToMany, otm)#>)
+				{
+					var has = usedObjects.ContainsKey("<#=U.TableName(otm.Value)#>" + item.Id);
+					var copyitem = has ? usedObjects["<#=U.TableName(otm.Value)#>" + item.Id] as <#=U.TableName(otm.Value)#> : item.Clone(true, usedObjects);
+					copyitem.<#=U.IdLessPropertyName(otm.Key)#> = copy;
+					copy.<#=U.OneToManyName(OneToMany, otm)#>.Add(copyitem);
+
+					if (!usedObjects.ContainsKey("<#=U.TableName(otm.Value)#>" + item.Id))
+						usedObjects.Add("<#=U.TableName(otm.Value)#>" + item.Id, copyitem);
+				}
+<#+}#>
+			}
+			return copy;
+		}
+
+		public override void WriteXml(XmlTextWriter writer)
+		{
+			WriteXml(writer, new string[] {});
+		}
+
+		public override void WriteXml(XmlTextWriter writer, params string[] moreFields)
+		{
+			writer.WriteStartElement("<#=U.TableName(t)#>");
+<#+foreach (Column col in Fields) {#>
+			writer.WriteAttributeString("<#=U.PropertyName(col)#>", <#+ if (U.FromDataType(col.DataType) == typeof(string)) {#>(<#=U.PropertyName(col)#> ?? "") <#+} else {#><#=U.PropertyName(col)#><#+}#>.ToString());
+<#+}#>
+<#+ if (OneToMany.Count > 0) { #>
+			foreach (string field in moreFields)
+			{
+<#+foreach (KeyValuePair<Column, string> otm in OneToMany) {#>
+				if (field == "<#=U.OneToManyName(OneToMany, otm)#>")
+				{
+					writer.WriteStartElement("<#=U.OneToManyName(OneToMany, otm)#>");
+					foreach (var item in <#=U.OneToManyName(OneToMany, otm)#>)
+					{
+						item.WriteXml(writer);
+					}
+					writer.WriteEndElement();
+				}
+<#+}#>
+			}
+<#+}#>
+			writer.WriteEndElement();
+		}
+
+<#+if (OrdinalNoColumn != null) {#>
+		public override int CompareTo(object other)
+		{
+			return this.<#=U.PropertyName(OrdinalNoColumn)#>.CompareTo((other as <#=U.TableName(t)#>).<#=U.PropertyName(OrdinalNoColumn)#>);
+		}
+<#+}#>
+	}
+}
+<#+
+	}
+}
+#>
