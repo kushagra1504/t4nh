@@ -1,0 +1,76 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#+
+public class Manager_generated : BizObjTemplate
+{
+	public Manager_generated(Table table, Config cfg) : base(table, cfg)
+	{
+	}
+	
+	public override void RenderCore()
+	{#>
+using System;
+using System.Collections.Generic;
+using NHibernate;
+using <#=cfg.NamespaceBusinessObjects#>;
+
+namespace <#=cfg.NamespaceManagers#>
+{
+	public partial class <#=U.TableName(t)#>Manager : ManagerBase<<#=U.TableName(t)#>, <#=U.CsType(PK) #>>
+	{
+		public static string TableName { get { return "<#=t.Name#>"; } }
+
+		public <#=U.TableName(t)#>Manager(ISession session, <#=cfg.UserContextInterfaceName#> userContext) : base(session, userContext) { }
+
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOne) {#>
+
+		public IList<<#=U.TableName(t)#>> GetBy<#=U.PropertyName(mto.Key)#>(<#=U.CsType(mto.Key)#> id)
+		{
+			ICriteria criteria = Session.CreateCriteria(typeof(<#=U.TableName(t)#>));
+<#+if (mto.Key.Nullable) {#>
+			if (id == null)
+				criteria.Add(NHibernate.Criterion.Restrictions.IsNull("<#=U.IdLessPropertyName(mto.Key)#>.Id"));
+			else
+	<#+}#>
+			criteria.Add(NHibernate.Criterion.Restrictions.Eq("<#=U.IdLessPropertyName(mto.Key)#>.Id", id));
+			return criteria.List< <#=U.TableName(t)#> >();
+		}
+<#+}#>
+<#+foreach (KeyValuePair<Column, string> mto in ManyToOneEnums) {#>
+
+		public IList<<#=U.TableName(t)#>> GetBy<#=U.IdLessPropertyName(mto.Key)#>(<#=U.TableName(mto.Value)#> <#=U.CamelCase(U.IdLessPropertyName(mto.Key))#>Val)
+		{
+			ICriteria criteria = Session.CreateCriteria(typeof(<#=U.TableName(t)#>));
+			criteria.Add(NHibernate.Criterion.Restrictions.Eq("<#=U.IdLessPropertyName(mto.Key)#>", <#=U.CamelCase(U.IdLessPropertyName(mto.Key))#>Val));
+			return criteria.List< <#=U.TableName(t)#> >();
+		}
+<#+}#>
+<#+foreach (StoredProcedure sp in StoredProcs) {#>
+
+		public void <#=U.SpName(t.Name, sp.Name)#>(<#=U.SpParams(sp, (p => U.CsType(p) + " " + U.SpParName(p)), ", ")#>)
+		{
+			IQuery query = Session.CreateSQLQuery("exec <#=sp.Name#> <#=U.SpParams(sp, (p => "@" + U.SpParName(p) + "=:" + U.SpParName(p)), ", ")#>");
+			<#=U.SpParams(sp, (p => "query.SetParameter(\"" + U.SpParName(p) + "\", " + U.SpParName(p) + ");"), "\r\n\t\t\t")#>
+			query.ExecuteUpdate();
+		}
+<#+}#>
+
+		public void SaveWithChildren(<#=U.TableName(t)#> obj)
+		{
+			Save(obj);
+
+<#+foreach (KeyValuePair<Column, string> otm in OneToMany) {#>
+			foreach (var item in obj.<#=U.OneToManyName(OneToMany, otm)#>)
+			{
+				new <#=U.TableName(otm.Value)#>Manager(this.Session, this.UserContext).SaveWithChildren(item);
+			}
+<#+}#>
+		}
+	}
+}
+<#+
+	}
+}#>

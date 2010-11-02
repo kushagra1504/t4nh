@@ -1,0 +1,259 @@
+﻿<#@ assembly name="System.Data" #>
+<#@ output extension="txt" #>
+<#@ import namespace="System.Data" #>
+<#+
+public class Config
+{
+	public string DatabaseName;
+	public string AssemblyName;
+	public string NamespaceBusinessObjects;
+	public string NamespaceManagers;
+	public string TablePrefix = "";
+	public string ViewPrefix = "";
+	public string UserContextInterfaceName = "";
+	public string[] IgnoreTables;
+	public Dictionary<string, string> TreatAsEnums; // Key = table name, Value = field name for title
+
+	public Config()
+	{
+		IgnoreTables = new string[0];
+		TreatAsEnums = new Dictionary<string, string>();
+	}
+	
+	public void Configure()
+	{
+		if (TreatAsEnums.Count > 0)
+		{
+			string[] ignore = new string[IgnoreTables.Length + TreatAsEnums.Count];
+			Array.Copy(IgnoreTables, ignore, IgnoreTables.Length);
+			TreatAsEnums.Keys.CopyTo(ignore, IgnoreTables.Length);
+			IgnoreTables = ignore;
+		}
+	}
+}
+
+public abstract class NhiberTemplate : Template
+{
+	private StringBuilder transformingText = new StringBuilder();
+	public void Write(string s)
+	{
+		transformingText.Append(s);
+	}
+
+	public override string TransformText()
+	{
+		RenderCore();
+		return transformingText.ToString();
+	}
+
+	public abstract void RenderCore();
+}
+
+public abstract class BizObjTemplate : NhiberTemplate
+{
+	public Table t;
+	public Config cfg;
+	
+	public Dictionary<string, string> props;
+
+	protected Column PK;
+	protected Dictionary<Column, string> ManyToOne = new Dictionary<Column, string>(); // value == referenced table name
+	protected Dictionary<Column, string> OneToMany; // value == referenced table name, key = column there
+	protected Column[] Fields;
+	protected Dictionary<Column, string> Enums = new Dictionary<Column, string>(); // value == referenced table name
+	protected Dictionary<Column, string> ManyToOneEnums = new Dictionary<Column, string>(); // value == referenced table name
+
+	protected Column OrdinalNoColumn = null;
+
+	/*	<bag name="Concepts" table="dbo.Concept_Value" lazy="true" cascade="all" inverse="false" >
+		 <key column="CodeTable_PK_Id"></key>
+		 <many-to-many column="Concept_Id" class="Concept" />
+		</bag>
+
+		bag/@name = U.ToPlural(Value.ReferencedTable);
+		bag/@table = (Key.Parent as Table).Schema + "." + (Key.Parent as Table).Name;
+		bag/key/@column = Key.Name;
+		bag/many-to-many/@column = Value.Columns[0].Name;
+		bag/many-to-many/@class = Value.ReferencedTable;
+	*/
+	protected Dictionary<Column, ForeignKey> ManyToMany;
+
+	public BizObjTemplate(Table table, Config cfg)
+	{
+		this.t = table;
+		this.cfg = cfg;
+		
+		var a = t.ExtendedProperties.Count; a = t.Columns.Count; // fuc**n' lazy init
+		a = table.Parent.UserDefinedDataTypes.Count; // fuc**n' lazy init
+		props = MExt.GetProps(t);
+		
+		Column[] cols = new Column[t.Columns.Count];
+		t.Columns.CopyTo(cols, 0);
+		PK = Array.Find(cols, x => x.InPrimaryKey);
+		
+		if (PK == null)
+		{
+			throw new Exception("Table " + table.Name + " has no PK. Please add one.");
+		}
+		a = t.ForeignKeys.Count; // fuc**n' lazy init
+		foreach (ForeignKey fk in t.ForeignKeys)
+		{
+			var c = t.Columns[fk.Columns[0].Name];
+			var reftable = fk.ReferencedTable;
+			if (cfg.TreatAsEnums.ContainsKey(reftable))
+			{
+				Enums.Add(c, reftable);
+				ManyToOneEnums.Add(c, reftable);
+			}
+			else
+			{
+				if (fk.Columns[0].Name == PK.Name) continue;
+				if (Array.IndexOf(cfg.IgnoreTables, reftable) != -1) continue;
+				ManyToOne.Add(c, reftable);
+			}
+		}
+		
+		MExt.FillOnetomanyManytomany(cfg, PK, out OneToMany, out ManyToMany);
+		Fields = Array.FindAll(cols, x => x != PK && !ManyToOne.ContainsKey(x) && !Enums.ContainsKey(x));
+		OrdinalNoColumn = Array.Find(Fields, r => r.Name.Contains("ordinal_no") || r.Name.Contains("sequence"));
+	}
+	
+	private StoredProcedure[] storedProcs = null;
+	protected StoredProcedure[] StoredProcs
+	{
+		get
+		{
+			if (storedProcs == null)
+			{
+				
+				List<StoredProcedure> insp = new List<StoredProcedure>();
+				var a = t.Parent.StoredProcedures.Count; // fuc**n' lazy init
+				foreach (StoredProcedure sp in t.Parent.StoredProcedures)
+				{
+					if (!sp.Name.StartsWith(t.Name))
+						continue;
+					if (t.Parent.Tables.Cast<Table>().Where(t0 => t0.Name != t.Name && t.Name.Length < t0.Name.Length && sp.Name.StartsWith(t0.Name)).Any())
+						continue;
+					insp.Add(sp);
+				}
+				storedProcs = insp.ToArray();
+			}
+			return storedProcs;
+		}
+	}
+}
+
+public abstract class BizObjViewTemplate : NhiberTemplate
+{
+	public View v;
+	public Config cfg;
+	public Dictionary<string, string> props;
+	protected Column PK;
+	protected Column[] Fields;
+	protected Dictionary<Column, string> ManyToOne = new Dictionary<Column, string>(); // value == referenced table name
+	protected Dictionary<Column, string> OneToMany = new Dictionary<Column, string>(); // value == referenced table name, key = column there
+	protected Dictionary<Column, ForeignKey> ManyToMany = new Dictionary<Column, ForeignKey>();
+	protected Dictionary<Column, string> Enums = new Dictionary<Column, string>(); // value == referenced table name
+	
+	private class ViewImport
+	{
+		public string Name;
+		public Table Table;
+		public bool IsLeftJoin;
+		public bool IsRightJoin;
+	}
+	
+	public BizObjViewTemplate(View view, Config cfg)
+	{
+		this.v = view;
+		this.cfg = cfg;
+		
+		var a = v.ExtendedProperties.Count; a = v.Columns.Count; a = v.Parent.Tables.Count; // fuc**n' lazy init
+		props = MExt.GetProps(v);
+
+		Column[] cols = new Column[v.Columns.Count];
+		v.Columns.CopyTo(cols, 0);
+
+		PK = v.Columns["id"];
+		
+		var imports = Regex.Matches(v.TextBody, @"(FROM|((?<is_left>left)|(?<is_right>right)|)\s+(outer|inner)\s+join)\s+((\[|)dbo(\]|)\.|)(\[|)(?<name>\w+)(\]|)").Cast<Match>().Select(r => new ViewImport { Name = r.Groups["name"].Value, Table = view.Parent.Tables[r.Groups["name"].Value], IsLeftJoin = r.Groups["is_left"].Success, IsRightJoin = r.Groups["is_right"].Success });
+		
+		foreach (var col in cols)
+		{
+			var viewImport = imports.FirstOrDefault(r => r.Table.Columns.Count != 0 && r.Table.ForeignKeys.Cast<ForeignKey>().Any(fk => fk.Columns[0].Name == col.Name));
+			if (viewImport != null)
+			{
+				var reftable = viewImport.Table.ForeignKeys.Cast<ForeignKey>().First(r => r.Columns[0].Name == col.Name).ReferencedTable;
+				if (cfg.TreatAsEnums.ContainsKey(reftable))
+					Enums.Add(col, reftable);
+				else
+					ManyToOne.Add(col, reftable);
+			}
+		}
+		
+		if (PK != null)
+		{
+			var pkTableCols = imports.First() /* first since we think that 'FROM t_xxx' is a primary table with actual PK */.Table.Columns;
+			a = pkTableCols.Count;
+			MExt.FillOnetomanyManytomany(cfg, pkTableCols[PK.Name], out OneToMany, out ManyToMany);
+		}
+		
+		Fields = Array.FindAll(cols, x => x != PK && !ManyToOne.ContainsKey(x) && !Enums.ContainsKey(x));
+	}
+}
+
+public static class MExt
+{
+	public static Dictionary<string, string> GetProps(TableViewTableTypeBase tobj)
+	{
+		var props = new Dictionary<string, string>();
+		if (tobj.ExtendedProperties.Contains("MS_Description"))
+		{
+			string[] propsar = tobj.ExtendedProperties["MS_Description"].Value.ToString().Split(';');
+			foreach (string s in propsar)
+			{
+				string[] sar = s.Split('=');
+				props.Add(sar[0], sar.Length > 1 ? sar[1] : "");
+			}
+		}
+		return props;
+	}
+	
+	public static void FillOnetomanyManytomany(Config cfg, Column pkColumn, out Dictionary<Column, string> oneToMany, out Dictionary<Column, ForeignKey> manyToMany)
+	{
+		oneToMany = new Dictionary<Column, string>();
+		manyToMany = new Dictionary<Column, ForeignKey>();
+		
+		var table = pkColumn.Parent as Table;
+		
+		int a;
+		foreach (DataRow row in pkColumn.EnumForeignKeys().Rows)
+		{
+			string thereTableName = row["Table_Name"].ToString();
+			if (Array.IndexOf(cfg.IgnoreTables, thereTableName) != -1) continue;
+			
+			Table thereTable = table.Parent.Tables[thereTableName];
+			a = thereTable.Columns.Count; a = thereTable.ForeignKeys.Count; // fuc**n' lazy init
+			Column thereCol = thereTable.Columns[thereTable.ForeignKeys[row["Name"].ToString()].Columns[0].Name];
+
+			ForeignKey manyToManyFK = thereTable.ForeignKeys.Cast<ForeignKey>().FirstOrDefault(fk0 => fk0.Name != row["Name"].ToString());
+			bool isInEnums = manyToManyFK == null ? false : cfg.TreatAsEnums.ContainsKey(manyToManyFK.ReferencedTable);
+
+			if (thereTable.ForeignKeys.Count != 2
+				|| thereTable.Columns.Cast<Column>().Where(c => !c.IsForeignKey && !c.InPrimaryKey).LongCount() > 0
+				|| manyToManyFK == null
+				|| isInEnums)
+			{
+				// one-to-many
+				oneToMany.Add(thereCol, row["Table_Name"].ToString());
+			}
+			else
+			{
+				// many-to-many
+				if (!isInEnums)
+					manyToMany.Add(thereCol, manyToManyFK);
+			}
+		}
+	}
+}
+#>

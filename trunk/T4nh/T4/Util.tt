@@ -1,0 +1,172 @@
+﻿<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="System.Core" #>
+<#@ output extension="txt" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Text.RegularExpressions" #>
+<#@ import namespace="System.Linq" #>
+<#+
+public static class U
+{
+	private static string[] SystemClassNames = new string[] { "Attribute" };
+	public static Config Config;
+	
+	public static Type FromDataType(DataType dt) { return FromDataType(dt, dt.Name); }
+	public static Type FromDataType(DataType dt, string colName)
+	{
+		switch (colName)
+		{
+			case "char": case "nchar": case "varchar": case "nvarchar": case "text": case "ntext": return typeof(string);
+			case "uniqueidentifier": return typeof(Guid);
+			case "bit": return typeof(bool);
+			case "tinyint": return typeof(byte);
+			case "smallint": return typeof(short);
+			case "int": return typeof(int);
+			case "bigint": return typeof(long);
+			case "smallmoney": case "money":
+			case "numeric": case "decimal": return typeof(decimal);
+			case "real": return typeof(System.Single);
+			case "float": return typeof(double);
+			case "smalldatetime": case "datetime": case "date": return typeof(DateTime);
+			case "":
+				if (dt.SqlDataType == SqlDataType.Xml)
+					return typeof(string);
+				break;
+		}
+		return typeof(object);
+	}
+	
+	public static string NHiberType(Column c)
+	{
+		if (c.DataType.Name == "text" || c.DataType.Name == "ntext")
+			return "StringClob";
+		var dt = (c.DataType.SqlDataType == SqlDataType.UserDefinedDataType ? FromDataType(null, ((Table)c.Parent).Parent.UserDefinedDataTypes[c.DataType.Name].SystemType) : FromDataType(c.DataType));
+		return dt.FullName;
+	}
+	
+	public static string CsType(Column c)
+	{
+		if (c.DataType.SqlDataType == SqlDataType.UserDefinedDataType)
+		{
+			var dt0 = FromDataType(null, ((Table)c.Parent).Parent.UserDefinedDataTypes[c.DataType.Name].SystemType);
+			return dt0.FullName + (c.Nullable && dt0 != typeof(string) ? "?" : "");
+		}
+
+		var dt = FromDataType(c.DataType);
+		return dt.FullName + (c.Nullable && dt != typeof(string) ? "?" : "");
+	}
+
+	public static string CsType(StoredProcedureParameter p) { return (p.IsOutputParameter ? "out " : "") + FromDataType(p.DataType).FullName + (FromDataType(p.DataType) != typeof(string) ? "?" : ""); }
+	
+	public static string TableName(TableViewTableTypeBase t) { return TableName(t.Name); }
+	public static string TableName(string tn)
+	{
+		tn = RemovePrefix(tn);
+		if (Array.IndexOf(SystemClassNames, tn) != -1)
+			tn += "Class";
+		return PascalCase(tn);
+	}
+	public static string ViewName(TableViewTableTypeBase v) { return TableName(v.Name) + "View"; }
+	
+	public static string PropertyName(Column c) { return PascalCase(c.Name.Replace(" ", "")); }
+	
+	public static string IdLessPropertyName(Column col) { return PascalCase(Regex.Replace(col.Name, @"(?i)(_id|id)\z", "")); }
+	
+	public static string ListName(string s) { return PascalCase(ToPlural(s)); }
+	
+	public static string OneToManyName(Dictionary<Column, string> all, KeyValuePair<Column, string> otm)
+	{
+		if (all.Values.LongCount(v => v == otm.Value) > 1)
+			return ListName(RemovePrefix(otm.Value)) + IdLessPropertyName(otm.Key);
+		return ListName(RemovePrefix(otm.Value));
+	}
+	
+	public static string ManyToManyName(Dictionary<Column, ForeignKey> all, KeyValuePair<Column, ForeignKey> mtm)
+	{
+		var tableName = (mtm.Key.Parent as Table).Name;
+		var part1 = ListName(RemovePrefix((mtm.Key.Parent as Table).Name));
+
+		if (all.Keys.LongCount(v => (v.Parent as Table).Name == tableName) > 1)
+			return part1 + "To" + PascalCase(mtm.Value.Columns[0].Name);
+		return ListName(RemovePrefix(mtm.Value.ReferencedTable));
+	}
+
+	public static string SpName(string tableName, string spName) { return PascalCase(spName.Replace(tableName, "").Trim('_')); }
+	public static string SpParName(StoredProcedureParameter p) { return p.Name.TrimStart('@'); }
+	public static string SpParams(StoredProcedure sp, Func<StoredProcedureParameter, string> format, string separator)
+	{
+		StringBuilder sb = new StringBuilder();
+		foreach (StoredProcedureParameter p in sp.Parameters)
+		{
+			if (p != sp.Parameters[0] ) sb.Append(separator);
+			sb.Append(format(p));
+		}
+		return sb.ToString();
+	}
+	
+	public static string CamelCase(string s)
+	{
+		return Regex.Replace(Regex.Replace(s, "(?i)_([a-z])", m => m.Groups[1].Value.ToUpper()), @"\A([A-Z])", m => m.Groups[1].Value.ToLower());
+	}
+	
+	public static string PascalCase(string s)
+	{
+		return Regex.Replace("_" + s, "(?i)_([a-z])", m => m.Groups[1].Value.ToUpper());
+	}
+	
+	public static string ToPlural(string s)
+	{
+		if (s.EndsWith("Deer")) return s.Substring(0, s.Length - 4) + "ManyDeer";
+		if (s.EndsWith("Sheep")) return s.Substring(0, s.Length - 5) + "ManySheep";
+		if (s.EndsWith("Foot")) return s.Substring(0, s.Length - 4) + "Feet";
+		if (s.EndsWith("Tooth")) return s.Substring(0, s.Length - 5) + "Teeth";
+		if (s.EndsWith("Man")) return s.Substring(0, s.Length - 3) + "Men";
+		if (s.EndsWith("Woman")) return s.Substring(0, s.Length - 5) + "Women";
+		if (s.EndsWith("Mouse")) return s.Substring(0, s.Length - 5) + "Mice";
+		if (s.EndsWith("Goose")) return s.Substring(0, s.Length - 5) + "Geese";
+		if (s.EndsWith("Louse")) return s.Substring(0, s.Length - 5) + "Lice";
+		if (s.EndsWith("Ox")) return s.Substring(0, s.Length - 2) + "Oxen";
+		// not English words
+		if (s.EndsWith("Phenomenon"))  return s.Substring(0, s.Length - 10) + "Phenomena";
+		if (s.EndsWith("Formula"))  return s.Substring(0, s.Length - 7) + "Formulae";
+
+		var sL = s.ToLower();
+		// -o, but not English word
+		if (sL.EndsWith("ratio")) return s.Substring(0, s.Length - 5) + "Ratios";
+
+		//----------------
+		if (s.EndsWith("y"))
+		{
+			var c = s[s.Length - 2];
+			if(("aeijouy").IndexOf(c) == -1)
+				return s.Substring(0, s.Length - 1) + "ies";
+			else
+				return s + "s";
+		}
+		// -ce, -ge, -se, -ze (s)
+		if (s.EndsWith("ce") || s.EndsWith("ge") || s.EndsWith("se") || s.EndsWith("ze"))
+			return s + "s";
+		// -o, -x, -s, -ss, -sh, -ch (es)
+		if (s.EndsWith("o") || s.EndsWith("x") || s.EndsWith("s") || s.EndsWith("ss") || s.EndsWith("sh") || s.EndsWith("ch"))
+			return s + "es";
+
+		// calf, half,  leaf,  loaf, self, sheaf, shelf, thief, wife, wolf
+		if (sL.EndsWith("calf") || sL.EndsWith("half") || sL.EndsWith("leaf") || sL.EndsWith("loaf") || sL.EndsWith("self") 
+		|| sL.EndsWith("sheaf") || sL.EndsWith("shelf") || sL.EndsWith("thief") || sL.EndsWith("wife") || sL.EndsWith("wolf"))
+			return s.Substring(0, s.Length - 1) + "ves";
+		// knife, life
+		if (sL.EndsWith("knife") || sL.EndsWith("life"))
+			return s.Substring(0, s.Length - 2) + "ves";
+		return s + "s";
+	}
+
+	public static string RemovePrefix(string input)
+	{
+		if (Config.TablePrefix.Length > 0 && input.StartsWith(Config.TablePrefix))
+			return input.Substring(Config.TablePrefix.Length);
+		if (Config.ViewPrefix.Length > 0 && input.StartsWith(Config.ViewPrefix))
+			return input.Substring(Config.ViewPrefix.Length);
+		return input;
+	}
+}
+#>

@@ -1,0 +1,125 @@
+﻿<#@ assembly name="Microsoft.SqlServer.ConnectionInfo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Smo, Version=10.0.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91, processorArchitecture=MSIL" #>
+<#@ assembly name="Microsoft.SqlServer.Management.Sdk.Sfc" #>
+<#@ output extension="txt" #>
+<#@ import namespace="EnvDTE" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Smo" #>
+<#@ import namespace="Microsoft.SqlServer.Management.Common" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Linq" #>
+<#@ include file="Core.tt" #>
+<#@ include file="Util.tt" #>
+<#@ include file="LeaveTheSame.tt" #>
+<#@ include file="Code_Enums.tt" #>
+<#@ include file="Code_ManagerFactory.tt" #>
+<#@ include file="Code_BusinessObject.tt" #>
+<#@ include file="Code_BusinessObject_generated.tt" #>
+<#@ include file="Code_BusinessObject_hbm.tt" #>
+<#@ include file="Code_BusinessObjectView.tt" #>
+<#@ include file="Code_BusinessObjectView_generated.tt" #>
+<#@ include file="Code_BusinessObjectView_hbm.tt" #>
+<#@ include file="Code_Manager.tt" #>
+<#@ include file="Code_Manager_generated.tt" #>
+<#@ include file="Code_ManagerView.tt" #>
+<#@ include file="Code_ManagerView_generated.tt" #>
+<#+
+public class BaseGenerator : Generator
+{
+	public string ServerName;
+	public string ServerLogin;
+	public string ServerPwd;
+	public string DbName;
+	public string DbRelatedEnumsName;
+	public Config Config = new Config();
+	
+	protected override void RunCore()
+	{
+		Config.Configure();
+		
+		ServerConnection conn = new ServerConnection(ServerName, ServerLogin, ServerPwd);
+		conn.ConnectTimeout = 0;
+		conn.StatementTimeout = 0;
+		Server server = new Server(conn);
+		Database database = new Database(server, Config.DatabaseName);
+		database.Refresh();
+		U.Config = this.Config;
+		
+		foreach (Table table in database.Tables)
+		{
+			if (table.IsSystemObject) continue;
+			if (Array.Exists(Config.IgnoreTables, i => i == table.Name)) continue;
+
+			// BusinessObject
+			string fname = "..\\BusinessObjects\\" + U.TableName(table) + ".cs";
+			string fpath = Path.Combine(System.IO.Path.GetDirectoryName(TransformationContext.Host.TemplateFile), fname);
+			if (!File.Exists(fpath))
+				new BusinessObject(table, Config).RenderToFile("..\\BusinessObjects\\" + fname);
+			else
+				new LeaveTheSame(fpath).RenderToFile(fname);
+
+			// BusinessObject.generated
+			new BusinessObject_generated(table, Config).RenderToFile("..\\BusinessObjects\\" + U.TableName(table) + ".generated.cs");
+			
+			// BusinessObject.hbm
+			var hbmtmpl = new BusinessObject_hbm(table, Config);
+			hbmtmpl.Output.BuildAction = "EmbeddedResource";
+			hbmtmpl.RenderToFile("..\\BusinessObjects\\" + U.TableName(table) + ".hbm.xml");
+			
+			// ManagerObject
+			fname = "..\\ManagerObjects\\" + U.TableName(table) + "Manager.cs";
+			fpath = Path.Combine(System.IO.Path.GetDirectoryName(TransformationContext.Host.TemplateFile), fname);
+			if (!File.Exists(fpath))
+				new Manager(table, Config).RenderToFile(fname);
+			else
+				new LeaveTheSame(fpath).RenderToFile(fname);
+
+			// ManagerObject.generated
+			new Manager_generated(table, Config).RenderToFile("..\\ManagerObjects\\" + U.TableName(table) + "Manager.generated.cs");
+			
+			//var fpathgen = Path.Combine(System.IO.Path.GetDirectoryName(TransformationContext.Host.TemplateFile), "..\\ManagerObjects\\" + U.TableName(table) + "Manager.generated.cs");
+			//ProjectItem projectItem = TransformationContext.FindProjectItem(fpathgen);
+			//projectItem.Remove();
+			//var projectItem = TransformationContext.FindProjectItem(fpath);
+			//projectItem.ProjectItems.AddFromFile(fpathgen);
+		}
+		
+		foreach (View view in database.Views)
+		{
+			if (view.IsSystemObject) continue;
+			if((Config.ViewPrefix.Length > 0) && (!view.Name.StartsWith(Config.ViewPrefix))) continue;
+			
+			if (Array.Exists(Config.IgnoreTables, i => i == view.Name)) continue;
+
+			// BusinessObjectView
+			var fname = "..\\BusinessObjectViews\\" + U.ViewName(view) + ".cs";
+			var fpath = Path.Combine(System.IO.Path.GetDirectoryName(TransformationContext.Host.TemplateFile), fname);
+			if (!File.Exists(fpath))
+				new BusinessObjectView(view, Config).RenderToFile("..\\BusinessObjectViews\\" + fname);
+			else
+				new LeaveTheSame(fpath).RenderToFile(fname);
+
+			// BusinessObjectView.generated
+			new BusinessObjectView_generated(view, Config).RenderToFile("..\\BusinessObjectViews\\" + U.ViewName(view) + ".generated.cs");
+			
+			// BusinessObjectView.hbm
+			var hbmtmpl = new BusinessObjectView_hbm(view, Config);
+			hbmtmpl.Output.BuildAction = "EmbeddedResource";
+			hbmtmpl.RenderToFile("..\\BusinessObjectViews\\" + U.ViewName(view) + ".hbm.xml");
+			
+			// ManagerObject
+			fname = "..\\ManagerObjectViews\\" + U.ViewName(view) + "Manager.cs";
+			fpath = Path.Combine(System.IO.Path.GetDirectoryName(TransformationContext.Host.TemplateFile), fname);
+			if (!File.Exists(fpath))
+				new ManagerView(view, Config).RenderToFile(fname);
+			else
+				new LeaveTheSame(fpath).RenderToFile(fname);
+
+			// ManagerObject.generated
+			new ManagerView_generated(view, Config).RenderToFile("..\\ManagerObjectViews\\" + U.ViewName(view) + "Manager.generated.cs");
+		}
+		
+		new Enums(conn, Config).RenderToFile("..\\" + DbRelatedEnumsName + ".cs");
+		new ManagerFactory(database, Config).RenderToFile("..\\ManagerFactory.generated.cs");
+	}
+}
+#>

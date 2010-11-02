@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.30703</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{5624DF27-9206-4C09-A0EC-AC8F8821132E}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>T4nh</RootNamespace>
+    <AssemblyName>T4nh</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Iesi.Collections">
+      <HintPath>..\Components\Iesi.Collections.dll</HintPath>
+    </Reference>
+    <Reference Include="LinFu.DynamicProxy">
+      <HintPath>..\Components\LinFu.DynamicProxy.dll</HintPath>
+    </Reference>
+    <Reference Include="NHibernate">
+      <HintPath>..\Components\NHibernate.dll</HintPath>
+    </Reference>
+    <Reference Include="NHibernate.ByteCode.LinFu">
+      <HintPath>..\Components\NHibernate.ByteCode.LinFu.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="BusinessBase.cs" />
+    <Compile Include="BusinessViewBase.cs" />
+    <Compile Include="INwContext.cs" />
+    <Compile Include="ManagerBase.cs" />
+    <Compile Include="ManagerFactory.cs" />
+    <Compile Include="ManagerViewBase.cs" />
+    <Compile Include="NHibernateSession.cs" />
+    <Compile Include="NHibernateSessionManager.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="T4\BaseGenerator.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>BaseGenerator.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_BusinessObject.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_BusinessObject.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_BusinessObjectView.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_BusinessObjectView.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_BusinessObjectView_generated.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_BusinessObjectView_generated.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_BusinessObjectView_hbm.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_BusinessObjectView_hbm.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_BusinessObject_generated.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_BusinessObject_generated.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_BusinessObject_hbm.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_BusinessObject_hbm.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_Enums.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_Enums.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_Manager.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_Manager.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_ManagerFactory.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_ManagerFactory.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_ManagerView.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_ManagerView.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_ManagerView_generated.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_ManagerView_generated.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Code_Manager_generated.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Code_Manager_generated.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Core.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Core.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Generator.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Generator.cs</LastGenOutput>
+    </None>
+    <None Include="T4\LeaveTheSame.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>LeaveTheSame.cs</LastGenOutput>
+    </None>
+    <None Include="T4\Util.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <LastGenOutput>Util.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

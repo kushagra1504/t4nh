@@ -1,0 +1,25 @@
+﻿<#@ template language="C#v3.5" hostspecific="True" debug="True" #>
+<#@ output extension="txt" #>
+<#@ include file="T4Toolbox.tt" #>
+<#@ include file="BaseGenerator.tt" #>
+<#
+BaseGenerator generator = new BaseGenerator();
+generator.ServerName = @"genillite\sql2008";
+generator.ServerLogin = "sa";
+generator.ServerPwd = "sa";
+generator.Config.DatabaseName = "northwind";
+generator.Config.AssemblyName = "BusinessServices";
+generator.Config.NamespaceBusinessObjects = "Genius.Northwind.BusinessServices.BusinessObjects";
+generator.Config.NamespaceManagers = "Genius.Northwind.BusinessServices.ManagerObjects";
+generator.Config.IgnoreTables = new string[] {
+	"Log",
+	"tmp_users"
+	};
+generator.Config.TreatAsEnums.Add("t_user_role", "name;description");
+
+generator.Config.UserContextInterfaceName = "INwContext";
+generator.DbRelatedEnumsName = "DbEnums";
+generator.Config.TablePrefix = "t_";
+generator.Config.ViewPrefix = "v_"; // And Filter for Views
+generator.Run();
+#>
