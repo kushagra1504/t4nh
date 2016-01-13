@@ -1,0 +1,1 @@
+T4 Template set for NHibernate
